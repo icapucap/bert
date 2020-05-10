@@ -18,8 +18,8 @@ class Config:
     data: str
     lang: str
 
-    base_log_dir: str = 'logs'
-    base_output_dir: str = 'output'
+    # base_log_dir: str = '/home/shidhu/itr/logs'
+    # base_output_dir: str = '/home/shidhu/itr/output'
 
     #embed_dim: int = 100
     hidden_size: int = 256
@@ -38,17 +38,17 @@ class Config:
     decoder: Decoder = Decoder()
     encoder: Encoder = Encoder()
 
-    def __post_init__(self):
-        self.log_dir = Path(self.base_log_dir) / self.exp_name
-        self.log_dir.mkdir(parents=False, exist_ok=True)
+    # def __post_init__(self):
+    #     self.log_dir = Path(self.base_log_dir) / self.exp_name
+    #     self.log_dir.mkdir(parents=False, exist_ok=True)
 
-        output_dir = Path(self.base_output_dir) / self.exp_name
-        self.model_output_dirs = ED({})
+    #     output_dir = Path(self.base_output_dir) / self.exp_name
+    #     self.model_output_dirs = ED({})
 
-        for m in ['encoder', 'decoder']:
-            out = output_dir / m
-            out.mkdir(parents=True, exist_ok=True)
-            self.model_output_dirs[m] = out
+    #     for m in ['encoder', 'decoder']:
+    #         out = output_dir / m
+    #         out.mkdir(parents=True, exist_ok=True)
+    #         self.model_output_dirs[m] = out
 
 
 hc1 = Config(data='itr/',
