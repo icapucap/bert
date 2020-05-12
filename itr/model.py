@@ -7,6 +7,10 @@ from transformers import WEIGHTS_NAME, CONFIG_NAME
 import numpy as np
 from config import Config
 from torch.utils.data import Dataset, DataLoader
+from tensorflow import summary
+import tensorflow as tf
+import datetime
+
 
 class TranslationModel(pl.LightningModule):
 
@@ -19,6 +23,7 @@ class TranslationModel(pl.LightningModule):
         self.decoder = decoder
         self.tokenizers = tokenizers
         self.config = config
+        
         
 
     def forward(self, encoder_input_ids, decoder_input_ids):
@@ -35,7 +40,6 @@ class TranslationModel(pl.LightningModule):
     
     
     
-    device = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
     #device = torch.device("cpu")
 
     # def save_model(self, output_dir):
@@ -79,37 +83,60 @@ class TranslationModel(pl.LightningModule):
 
     def training_step(self, batch, batch_no):
     
+        device = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
+
         source = batch[0].to(device)
         target = batch[1].to(device)
 
-        loss, logits = TranslationModel(source,target)
+        loss, logits = self.forward(source,target)
         logits = logits.detach().cpu().numpy()
         label_ids = target.to('cpu').numpy()
         
-        logs = {'train_loss': loss}
+        logs = {'loss': loss}
         return {'loss': loss, 'log': logs}
     
     def validation_step(self, batch, batch_no):
+    
+        device = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
+
         source = batch[0].to(device)
         target = batch[1].to(device)
 
-        loss, logits = TranslationModel(source,target)
+        loss, logits = self.forward(source,target)
         logits = logits.detach().cpu().numpy()
         label_ids = target.to('cpu').numpy()
         
-        tmp_eval_accuracy = flat_accuracy(logits, label_ids)
-        eval_accuracy += tmp_eval_accuracy
-        eval_loss += loss
-        nb_eval_steps += 1
+        eval_accuracy = torch.from_numpy(np.asarray(self.flat_accuracy(logits, label_ids)))
+       
+        return {'eval_acc': eval_accuracy,'eval_loss': loss}
 
-        return {'eval_acc': eval_accuracy,'eval_loss': eval_loss}
 
     def validation_epoch_end(self,outputs):
+        val_loss = torch.stack([x['eval_loss'] for x in outputs]).mean()
+        val_acc = torch.stack([x['eval_acc'] for x in outputs]).mean()
+        log = {'avg_val_loss':val_loss}
+        tqdm_dict = {'val_loss': val_loss.item(), 'val_acc': val_acc.item()}
+        return {'log':log,'val_loss':log,'progress_bar': tqdm_dict }
 
-        avg_loss = torch.stack([x['eval_loss'] for x in outputs]).mean()
-        avg_acc = torch.stack([x['eval_acc'] for x in outputs]).mean()
-        tensorboard_logs = {'eval_loss': avg_loss, 'eval_acc': avg_acc}
-        return {'avg_val_loss': avg_loss, 'log': tensorboard_logs}
+   
+   
+    # def validation_end(self, outputs):
+    #     val_loss_mean = 0
+    #     val_acc_mean = 0
+    #     for output in outputs:
+    #         val_loss_mean += output['eval_loss']
+    #         val_acc_mean += output['eval_acc']
+
+    #     val_loss_mean /= len(outputs)
+    #     val_acc_mean /= len(outputs)
+    #     tqdm_dict = {'val_loss': val_loss_mean.item(), 'val_acc': val_acc_mean.item()}
+
+    #     # show val_loss and val_acc in progress bar but only log val_loss
+    #     results = {
+    #         'progress_bar': tqdm_dict,
+    #         'log': {'val_loss': val_loss_mean.item()}
+    #     }
+    #     return results
 
     def prepare_data(self):
         from data import split_data
@@ -134,12 +161,12 @@ class TranslationModel(pl.LightningModule):
                            collate_fn=pad_sequence)
     
     def configure_optimizers(self):
-        from config import Config
+        
         optimizer = torch.optim.Adam(self.parameters(), lr=self.config.lr)
         return optimizer
 
     def configure_schedulers(self):
-        from config import Config
+        
         scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, len(train_loader), eta_min=self.config.lr)
         return scheduler
 
@@ -198,7 +225,7 @@ def build_model(config):
 
 
     
-    return model , tokenizers
+    return model #, tokenizers
 
 
 
