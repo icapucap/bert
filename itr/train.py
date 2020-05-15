@@ -54,6 +54,7 @@ def main():
     
     trainer.fit(model)
     # model.save(tokenizers, rconf.model_output_dirs)
+    trainer.test()
 
 if __name__ == '__main__':
     #preproc_data()

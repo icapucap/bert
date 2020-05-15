@@ -118,6 +118,28 @@ class TranslationModel(pl.LightningModule):
         tqdm_dict = {'val_loss': val_loss.item(), 'val_acc': val_acc.item()}
         return {'log':log,'val_loss':log,'progress_bar': tqdm_dict }
 
+    def test_step(self, batch, batch_no):
+        
+        source = batch[0].to(device)
+        target = batch[1].to(device)
+
+        loss, logits = self.forward(source,target)
+        
+        logits = logits.detach().cpu().numpy()
+        label_ids = target.to('cpu').numpy()
+        
+        test_accuracy = torch.from_numpy(np.asarray(self.flat_accuracy(logits, label_ids)))
+       
+        return {'test_acc': test_accuracy}
+
+    def test_epoch_end(self, outputs):
+
+        avg_test_acc = torch.stack([x['test_acc'] for x in outputs]).mean()
+
+        tensorboard_logs = {'avg_test_acc': avg_test_acc}
+        return {'avg_test_acc': avg_test_acc, 'log': tensorboard_logs, 'progress_bar': tensorboard_logs}
+    
+
    
    
     # def validation_end(self, outputs):
@@ -147,7 +169,7 @@ class TranslationModel(pl.LightningModule):
         from data import IndicDataset, PadSequence
         pad_sequence = PadSequence(self.tokenizers.src.pad_token_id, self.tokenizers.tgt.pad_token_id)
 
-        return DataLoader(IndicDataset(self.tokenizers.src, self.tokenizers.tgt, self.config.data, True), 
+        return DataLoader(IndicDataset(self.tokenizers.src, self.tokenizers.tgt, self.config.data, True, False), 
                                 batch_size=self.config.batch_size, 
                                 shuffle=False, 
                                 collate_fn=pad_sequence)
@@ -155,7 +177,16 @@ class TranslationModel(pl.LightningModule):
         from data import IndicDataset, PadSequence
         pad_sequence = PadSequence(self.tokenizers.src.pad_token_id, self.tokenizers.tgt.pad_token_id)
 
-        return DataLoader(IndicDataset(self.tokenizers.src, self.tokenizers.tgt, self.config.data, False), 
+        return DataLoader(IndicDataset(self.tokenizers.src, self.tokenizers.tgt, self.config.data, False, False), 
+                           batch_size=self.config.eval_size, 
+                           shuffle=False, 
+                           collate_fn=pad_sequence)
+
+    def test_dataloader(self):
+        from data import IndicDataset, PadSequence
+        pad_sequence = PadSequence(self.tokenizers.src.pad_token_id, self.tokenizers.tgt.pad_token_id)
+
+        return DataLoader(IndicDataset(self.tokenizers.src, self.tokenizers.tgt, self.config.data, False,True), 
                            batch_size=self.config.eval_size, 
                            shuffle=False, 
                            collate_fn=pad_sequence)

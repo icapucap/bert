@@ -14,10 +14,19 @@ def split_data(file_path, destination):
     mask = np.random.rand(data.shape[0]) < 0.8
     train = data[mask]
     valid = data[~mask]
+    # print(valid.shape)
 
     train.to_csv(Path(destination) / 'train.csv', header=False, index=False)
+
+    mask_test = np.random.rand(valid.shape[0]) < 0.5
+    test = valid[mask_test]
+    valid = valid[~mask_test]
+    # print(test.shape,valid.shape)
+
+
     valid.to_csv(Path(destination) / 'valid.csv', header=False, index=False)
-#split_data('/home/shidhu/itr/itr/hin.txt', '/home/shidhu/itr/itr/')
+    test.to_csv(Path(destination) / 'test.csv', header=False, index=False)
+# split_data('/home/shidhu/itr/itr/hin.txt', '/home/shidhu/itr/itr/')
 
 
 class PadSequence:
@@ -47,8 +56,11 @@ class IndicDataset(Dataset):
                  src_tokenizer,
                  tgt_tokenizer,
                  destination,
-                 is_train=True):
-        destination += 'train.csv' if is_train else 'valid.csv'
+                 is_train=True,is_test=False):
+        if is_test:
+            destination += 'test.csv'
+        else:
+            destination += 'train.csv' if is_train else 'valid.csv'
         self.df = pd.read_csv(destination, header=None, engine='python',quotechar='"')
 
         self.src_tokenizer = src_tokenizer
