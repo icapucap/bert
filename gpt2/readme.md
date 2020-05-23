@@ -4,7 +4,7 @@
 export TRAIN_FILE=/path/to/dataset/wiki.train.raw
 export TEST_FILE=/path/to/dataset/wiki.test.raw
 
-python run_language_modeling.py \
+python lang-modelling.py \
     --output_dir=output \
     --model_type=gpt2 \
     --model_name_or_path=gpt2 \
