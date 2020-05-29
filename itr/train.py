@@ -34,7 +34,7 @@ from model import build_model
 def main():
     init_seed()
     rconf = preEncDec
-    model= build_model(rconf)
+    model,tokenizers= build_model(rconf)
 
     checkpoint_callback = ModelCheckpoint(
     filepath=os.getcwd(),  #saves checkpoint in the root dir
@@ -55,6 +55,10 @@ def main():
     trainer.fit(model)
     # model.save(tokenizers, rconf.model_output_dirs)
     trainer.test()
+    # torch.save(model,'/home/shidhu/itr/itr/checkpoints')
+    # model = torch.load('/home/shidhu/itr/itr/checkpoints')
+    
+    
 
 if __name__ == '__main__':
     #preproc_data()

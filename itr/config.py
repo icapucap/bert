@@ -34,6 +34,9 @@ class Config:
     eval_size: int = 16
     lr: float = 1e-3
 
+    max_length: int = 25
+    min_length: int = 1
+
 
     decoder: Decoder = Decoder()
     encoder: Encoder = Encoder()
@@ -51,7 +54,7 @@ class Config:
     #         self.model_output_dirs[m] = out
 
 
-hc1 = Config(data='itr/',
+hc1 = Config(data='/content/itr/',
                     exp_name='default',
                     lang='hi',
                 )
