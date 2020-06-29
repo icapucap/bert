@@ -36,9 +36,11 @@ data_collator = DataCollatorForLanguageModeling(
 from transformers import Trainer, TrainingArguments
 
 training_args = TrainingArguments(
-    output_dir="/home/shidhu/gpt2/output",
+    output_dir="/content/output",
     overwrite_output_dir=True,
-    num_train_epochs=1
+    num_train_epochs=3,
+    logging_dir='/content/output',save_steps=10_000,
+    save_total_limit=2
 )
 
 trainer = Trainer(
@@ -46,8 +48,24 @@ trainer = Trainer(
     args=training_args,
     data_collator=data_collator,
     train_dataset=dataset,
-    prediction_loss_only=True,
+    prediction_loss_only=True
+
 )
 
 trainer.train()
-trainer.save_model("/home/shidhu/gpt2/output")
+trainer.save_model("/content/output")
+
+input_context = '	बहुत समय से देखा नहीं '
+#greedy search
+input_ids = tokenizer.encode(input_context,return_tensors='pt')
+# greedy_output = model.generate(input_ids=input_ids,max_length=50)
+beam_outputs = model.generate(
+    input_ids, 
+    max_length=50, 
+    num_beams=3, 
+    no_repeat_ngram_size=2, 
+    num_return_sequences=3, 
+    early_stopping=True
+)
+# print(len(greedy_output))
+print(tokenizer.decode(beam_outputs[2],skip_special_tokens=True))
