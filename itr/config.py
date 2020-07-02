@@ -36,6 +36,17 @@ class Config:
 
     max_length: int = 25
     min_length: int = 1
+    do_sample: bool = False
+    early_stopping: bool = False
+    use_cache: bool = False
+    num_beams: int = 1
+    temperature: float = 0.5
+    top_k: int = 0
+    top_p: float = 0
+    repetition_penalty: float = 1.0
+    no_repeat_ngram_size: int = 0
+    num_return_sequences: int = 1
+    is_encoder_decoder: bool = True
 
 
     decoder: Decoder = Decoder()
@@ -54,7 +65,7 @@ class Config:
     #         self.model_output_dirs[m] = out
 
 
-hc1 = Config(data='/content/itr/',
+hc1 = Config(data='/home/shidhu/itr/itr/',              #'/content/itr/'
                     exp_name='default',
                     lang='hi',
                 )

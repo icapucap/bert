@@ -8,8 +8,8 @@ from torch.utils.tensorboard import SummaryWriter
 from pytorch_lightning.callbacks import ModelCheckpoint
 import os
 
-from pytorch_lightning.loggers import TensorBoardLogger
-logger = TensorBoardLogger("/content/itr/lightning_logs", name="my_model")
+# from pytorch_lightning.loggers import TensorBoardLogger
+# logger = TensorBoardLogger("/content/itr/lightning_logs", name="my_model")
 
 
 
@@ -34,30 +34,32 @@ from model import build_model
 def main():
     init_seed()
     rconf = preEncDec
-    model,tokenizers= build_model(rconf)
+    model,tokenizer= build_model(rconf)
 
-    checkpoint_callback = ModelCheckpoint(
-    filepath=os.getcwd(),  #saves checkpoint in the root dir
-    save_top_k=1,   #saves the best model
-    verbose=True,
-    monitor='val_loss',
-    mode='min'
-    )
+    # checkpoint_callback = ModelCheckpoint(
+    # filepath=os.getcwd(),  #saves checkpoint in the root dir
+    # save_top_k=1,   #saves the best model
+    # verbose=True,
+    # monitor='val_loss',
+    # mode='min'
+    # )
 
     # writer = SummaryWriter(rconf.log_dir)
     # train_losses, val_losses, val_accs = run_train(rconf, model, train_loader, eval_loader, writer)
     #
-    trainer = Trainer(max_epochs=3,logger= logger,log_save_interval=1,checkpoint_callback=checkpoint_callback)    
+    trainer = Trainer(max_epochs=1)#,logger= logger,log_save_interval=1,checkpoint_callback=checkpoint_callback)    
 
     #trainer.save_checkpoint('./my_checkpoint.ckpt') #for manually saving checkpoint
     #trainer = Trainer(resume_from_checkpoint=PATH,max_epochs=3) #path of the checkpoint file from where you want to continue training
     
     trainer.fit(model)
-    # model.save(tokenizers, rconf.model_output_dirs)
-    trainer.test()
-    # torch.save(model,'/home/shidhu/itr/itr/checkpoints')
-    # model = torch.load('/home/shidhu/itr/itr/checkpoints')
-    
+    trainer.test(model)
+    # input_context = 'बाहर निकल जाओ!'
+    # input_ids = tokenizer['src'].encode(input_context)
+    # print(input_ids)
+    # greedy_output = model.generate(input_ids=input_ids)
+    # print(greedy_output)
+    # print(tokenizer['tgt'].decode(greedy_output))
     
 
 if __name__ == '__main__':
