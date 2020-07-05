@@ -2,6 +2,7 @@ import torch
 from transformers import BertConfig, BertModel, BertForMaskedLM, BertTokenizer,BertLMHeadModel
 from transformers import DistilBertConfig
 from transformers import DistilBertTokenizer, DistilBertModel, DistilBertForMaskedLM
+from transformers.generation_utils import GenerationMixin
 from transformers import GPT2Model, GPT2Config
 import pytorch_lightning as pl
 from easydict import EasyDict as ED
@@ -220,15 +221,48 @@ class TranslationModel(pl.LightningModule):
         bos_token_id = self.tgt_tokenizers.bos_token_id
         pad_token_id = self.tgt_tokenizers.pad_token_id
         eos_token_id = self.tgt_tokenizers.eos_token_id
-        cur_len=1
-        # encoder_outputs = self.encoder(input_ids)
+        num_beams=1
+    
+        attention_mask = input_ids.new_ones(input_ids.shape)
+
+        effective_batch_size = batch_size
+        effective_batch_mult = 1
+        decoder_start_token_id = bos_token_id
+
+        encoder_outputs: tuple = self.encoder(input_ids, attention_mask=attention_mask)
+
+        input_ids = torch.full(
+                (effective_batch_size * num_beams, 1),
+                decoder_start_token_id,
+                dtype=torch.long,
+                device=next(self.parameters()).device,
+            )
+        cur_len = 1
+
+        assert (
+            batch_size == encoder_outputs[0].shape[0]
+        ), f"expected encoder_outputs[0] to have 1st dimension bs={batch_size}, got {encoder_outputs[0].shape[0]} "
+
+        # expand batch_idx to assign correct encoder output for expanded input_ids (due to num_beams > 1 and num_return_sequences > 1)
+        expanded_batch_idxs = (
+            torch.arange(batch_size)
+            .view(-1, 1)
+            .repeat(1, num_beams * effective_batch_mult)
+            .view(-1)
+            .to(input_ids.device)
+        )
+        # expand encoder_outputs
+        encoder_outputs = (encoder_outputs[0].index_select(0, expanded_batch_idxs), *encoder_outputs[1:])
+
 
         unfinished_sents = input_ids.new(batch_size).fill_(1)
         sent_lengths = input_ids.new(batch_size).fill_(max_length)
-        past = self.encoder(input_ids)
+        
+        past = (encoder_outputs, None)
+        
         while cur_len<max_length:
             model_inputs = self.decoder.prepare_inputs_for_generation(
-                input_ids,attention_mask=past[-1]
+                input_ids,past=past,attention_mask=attention_mask
             )
 
             outputs = self.decoder(**model_inputs)
