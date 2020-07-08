@@ -216,14 +216,18 @@ class TranslationModel(pl.LightningModule):
         scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, len(self.train_dataloader()), eta_min=self.config.lr)
         return scheduler
 
+    def prepare_inputs_for_generation(self, input_ids, **kwargs):
+        return {"input_ids": input_ids}
+
+
     def generate(self,input_ids,max_length=20):
-        batch_size=input_ids.shape[0]
+        batch_size=self.config.eval_size
         bos_token_id = self.tgt_tokenizers.bos_token_id
         pad_token_id = self.tgt_tokenizers.pad_token_id
         eos_token_id = self.tgt_tokenizers.eos_token_id
         num_beams=1
     
-        attention_mask = input_ids.new_ones(input_ids.shape)
+        attention_mask = input_ids.ne(pad_token_id).long()
 
         effective_batch_size = batch_size
         effective_batch_mult = 1
@@ -261,7 +265,7 @@ class TranslationModel(pl.LightningModule):
         past = (encoder_outputs, None)
         
         while cur_len<max_length:
-            model_inputs = self.decoder.prepare_inputs_for_generation(
+            model_inputs = self.prepare_inputs_for_generation(
                 input_ids,past=past,attention_mask=attention_mask
             )
 
@@ -304,8 +308,8 @@ class TranslationModel(pl.LightningModule):
         else:
             decoded = input_ids
 
-        for hypo_idx, hypo in enumerate(input_ids):
-            decoded[hypo_idx, : sent_lengths[hypo_idx]] = hypo[: sent_lengths[hypo_idx]]
+        # for hypo_idx, hypo in enumerate(input_ids):
+        #     decoded[hypo_idx, : sent_lengths[hypo_idx]] = hypo[: sent_lengths[hypo_idx]]
 
         return decoded
 
