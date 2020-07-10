@@ -126,9 +126,10 @@ class TranslationModel(pl.LightningModule):
     def test_step(self,batch,batch_no):
         device = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
         source = batch[0].to(device)
-        print(source)
+        # print(source)
+        
         output = self.generate(source)
-        print(output)
+        # print(output)
         print(self.tgt_tokenizers.decode(output[0]))
 
     # def test_step(self, batch, batch_no):
@@ -176,8 +177,8 @@ class TranslationModel(pl.LightningModule):
 
     def prepare_data(self):
         from data import split_data
-        # split_data('/content/itr/hin.txt', '/content/itr/')
-        split_data('/home/shidhu/itr/itr/hin.txt', '/home/shidhu/itr/itr/')
+        split_data('/content/itr/hin.txt', '/content/itr/')
+        # split_data('/home/shidhu/itr/itr/hin.txt', '/home/shidhu/itr/itr/')
 
     
     def train_dataloader(self):
@@ -202,7 +203,7 @@ class TranslationModel(pl.LightningModule):
         pad_sequence = PadSequence(self.src_tokenizers.pad_token_id, self.tgt_tokenizers.pad_token_id)
 
         return DataLoader(IndicDataset(self.src_tokenizers, self.tgt_tokenizers, self.config.data, False,True), 
-                           batch_size=self.config.eval_size, 
+                           batch_size=1, 
                            shuffle=False, 
                            collate_fn=pad_sequence)
     
@@ -213,7 +214,7 @@ class TranslationModel(pl.LightningModule):
 
     def configure_schedulers(self):
         optimizer = self.configure_optimizers()
-        scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, len(self.train_dataloader()), eta_min=self.config.lr)
+        scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode='min', factor=0.1, patience=10, verbose=False, threshold=0.0001, threshold_mode='rel', cooldown=0, min_lr=self.config.lr, eps=1e-08)
         return scheduler
 
     def prepare_inputs_for_generation(self, input_ids, **kwargs):
@@ -221,7 +222,8 @@ class TranslationModel(pl.LightningModule):
 
 
     def generate(self,input_ids,max_length=20):
-        batch_size=self.config.eval_size
+        batch_size=input_ids.shape[0]
+        max_length=max_length
         bos_token_id = self.tgt_tokenizers.bos_token_id
         pad_token_id = self.tgt_tokenizers.pad_token_id
         eos_token_id = self.tgt_tokenizers.eos_token_id
@@ -233,9 +235,9 @@ class TranslationModel(pl.LightningModule):
         effective_batch_mult = 1
         decoder_start_token_id = bos_token_id
 
-        encoder_outputs: tuple = self.encoder(input_ids, attention_mask=attention_mask)
-
-        input_ids = torch.full(
+        # encoder_outputs: tuple = self.encoder(input_ids, attention_mask=attention_mask)
+        #dummy input_ids for decoder
+        input_ids_dummy = torch.full(
                 (effective_batch_size * num_beams, 1),
                 decoder_start_token_id,
                 dtype=torch.long,
@@ -243,34 +245,34 @@ class TranslationModel(pl.LightningModule):
             )
         cur_len = 1
 
-        assert (
-            batch_size == encoder_outputs[0].shape[0]
-        ), f"expected encoder_outputs[0] to have 1st dimension bs={batch_size}, got {encoder_outputs[0].shape[0]} "
+        # assert (
+        #     batch_size == encoder_outputs[0].shape[0]
+        # ), f"expected encoder_outputs[0] to have 1st dimension bs={batch_size}, got {encoder_outputs[0].shape[0]} "
 
         # expand batch_idx to assign correct encoder output for expanded input_ids (due to num_beams > 1 and num_return_sequences > 1)
-        expanded_batch_idxs = (
-            torch.arange(batch_size)
-            .view(-1, 1)
-            .repeat(1, num_beams * effective_batch_mult)
-            .view(-1)
-            .to(input_ids.device)
-        )
-        # expand encoder_outputs
-        encoder_outputs = (encoder_outputs[0].index_select(0, expanded_batch_idxs), *encoder_outputs[1:])
+        # expanded_batch_idxs = (
+        #     torch.arange(batch_size)
+        #     .view(-1, 1)
+        #     .repeat(1, num_beams * effective_batch_mult)
+        #     .view(-1)
+        #     .to(input_ids.device)
+        # )
+        # # expand encoder_outputs
+        # encoder_outputs = (encoder_outputs[0].index_select(0, expanded_batch_idxs), *encoder_outputs[1:])
 
 
         unfinished_sents = input_ids.new(batch_size).fill_(1)
         sent_lengths = input_ids.new(batch_size).fill_(max_length)
         
-        past = (encoder_outputs, None)
+        # past = (encoder_outputs, None)
         
         while cur_len<max_length:
-            model_inputs = self.prepare_inputs_for_generation(
-                input_ids,past=past,attention_mask=attention_mask
-            )
+            # model_inputs = self.prepare_inputs_for_generation(
+            #     input_ids,past=past,attention_mask=attention_mask
+            # )
 
-            outputs = self.decoder(**model_inputs)
-            next_token_logits = outputs[0][:,-1,:]
+            outputs = self.forward(input_ids,input_ids_dummy)
+            next_token_logits = outputs[:,-1,:]
             
                 # Greedy decoding
             next_token = torch.argmax(next_token_logits, dim=-1)
@@ -283,7 +285,7 @@ class TranslationModel(pl.LightningModule):
                 tokens_to_add = next_token
 
             # add token and increase length by one
-            input_ids = torch.cat([input_ids, tokens_to_add.unsqueeze(-1)], dim=-1)
+            input_ids_dummy = torch.cat([input_ids_dummy, tokens_to_add.unsqueeze(-1)], dim=-1)
             cur_len = cur_len + 1
 
             if eos_token_id is not None:
@@ -304,12 +306,12 @@ class TranslationModel(pl.LightningModule):
         if sent_lengths.min().item() != sent_lengths.max().item():
             assert pad_token_id is not None, "`Pad_token_id` has to be defined if batches have different lengths"
             # finished sents are filled with pad_token
-            decoded = input_ids.new(batch_size, sent_lengths.max().item()).fill_(pad_token_id)
+            decoded = input_ids_dummy.new(batch_size, sent_lengths.max().item()).fill_(pad_token_id)
         else:
-            decoded = input_ids
+            decoded = input_ids_dummy
 
-        # for hypo_idx, hypo in enumerate(input_ids):
-        #     decoded[hypo_idx, : sent_lengths[hypo_idx]] = hypo[: sent_lengths[hypo_idx]]
+        for hypo_idx, hypo in enumerate(input_ids_dummy):
+            decoded[hypo_idx, : sent_lengths[hypo_idx]] = hypo[: sent_lengths[hypo_idx]]
 
         return decoded
 
@@ -372,7 +374,7 @@ def build_model(config):
     # decoder = BertForMaskedLM(decoder_config)
     # decoder.set_input_embeddings(decoder_embeddings.cuda())
     model = TranslationModel(config,src_tokenizer,tgt_tokenizer,encoder,decoder)
-    # model.cuda()
+    model.cuda()
 
     tokenizers = ED({'src':src_tokenizer,'tgt':tgt_tokenizer})
 
