@@ -271,7 +271,7 @@ class TranslationModel(pl.LightningModule):
             #     input_ids,past=past,attention_mask=attention_mask
             # )
 
-            outputs = self.forward(input_ids,input_ids_dummy)
+            loss,outputs = self.forward(input_ids,input_ids_dummy)
             next_token_logits = outputs[:,-1,:]
             
                 # Greedy decoding
